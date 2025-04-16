@@ -1,0 +1,125 @@
+.ingest-container {
+  max-width: 800px;
+  margin: 40px auto;
+  padding: 24px;
+  background-color: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.ingest-container h2 {
+  text-align: center;
+  margin-bottom: 20px;
+  color: #333;
+  font-size: 1.8rem;
+  font-weight: 600;
+}
+
+.ingest-container form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ingest-container label {
+  font-weight: 500;
+  color: #444;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.ingest-container select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease;
+}
+
+.file-to-clickhouse-container{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 96.5%;
+  color: #333;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+}
+
+.ingest-container input[type="file"]{
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease;
+}
+
+.ingest-container input[type="text"]{
+  width: 97%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease;
+}
+
+.ingest-container select:focus,
+.ingest-container input:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+.ingest-container h4 {
+  margin: 10px 0;
+  color: #444;
+  font-weight: 500;
+}
+
+.connection-details {
+  border: 1px solid #ddd;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  background-color: #fafafa;
+}
+
+.connection-details p {
+  margin: 4px 0;
+  font-size: 0.95rem;
+}
+
+.ingest-container button {
+  background-color: #2563eb;
+  color: white;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.ingest-container button:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.ingest-container button:hover:enabled {
+  background-color: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.ingest-container p {
+  margin-top: 12px;
+  text-align: center;
+}
+
+.ingest-container p.error {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+.ingest-container p.success {
+  color: #16a34a;
+  font-weight: 500;
+}

@@ -1,0 +1,37 @@
+# === Node.js / Vite / React ===
+/frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+frontend/.DS_Store
+frontend/.eslintcache
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# === Spring Boot / Java ===
+/backend/target/
+backend/.classpath
+backend/.project
+backend/.settings/
+backend/.vscode/
+backend/.idea/
+backend/.gradle/
+backend/build/
+backend/out/
+
+# Ignore OS junk
+.DS_Store
+Thumbs.db
+
+# === Logs ===
+*.log
+logs/
+backend/logs/
+frontend/logs/
+
+# === Coverage Reports ===
+/frontend/coverage/
+/backend/coverage/

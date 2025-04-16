@@ -1,0 +1,49 @@
+.app-container {
+  max-width: 900px;
+  margin: 40px auto;
+  padding: 20px;
+  background-color: black;
+  border-radius: 16px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
+}
+
+.app-container h1 {
+  text-align: center;
+  color: white;
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 20px;
+}
+
+.app-container nav {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.app-container nav button {
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.app-container nav button:hover {
+  background-color: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.app-container nav button:active {
+  transform: translateY(0);
+}
+
+.app-container .tab-content {
+  margin-top: 20px;
+}

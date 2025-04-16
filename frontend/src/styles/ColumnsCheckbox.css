@@ -1,0 +1,16 @@
+.columns-checkbox-container {
+  padding: 1rem;
+}
+
+.columns-checkbox-container h4 {
+  margin-bottom: 0.5rem;
+}
+
+.columns-checkbox-list {
+  list-style: none;
+  padding: 0;
+}
+
+.columns-checkbox-list li {
+  margin: 0.3rem 0;
+}
