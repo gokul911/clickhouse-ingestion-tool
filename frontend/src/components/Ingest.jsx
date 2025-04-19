@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import ColumnsCheckbox from './ColumnsCheckbox';
 import { useNavigate } from 'react-router-dom';
+import ProgressBar from './ProgressBar';
 import "../styles/Ingest.css"
 
 export default function Ingest({ connection }) {
@@ -13,6 +14,7 @@ export default function Ingest({ connection }) {
   const [selectedColumns, setSelectedColumns] = useState([]);
   const [result, setResult] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleDirectionChange = (e) => setDirection(e.target.value);
@@ -116,24 +118,76 @@ export default function Ingest({ connection }) {
   };
   
 
+  // const handleSubmit = async (e) => {
+  //   e.preventDefault();
+
+  //   if (!connection) {
+  //     setError("No connection info provided. Please connect first.");
+  //     return;
+  //   }
+
+  //   try {
+  //     let response;
+
+  //     if (direction === 'file_to_clickhouse') {
+  //       const formData = new FormData();
+  //       const connectionWithTable = { ...connection, table };
+  //       formData.append('file', file);
+  //       formData.append('connection', JSON.stringify(connectionWithTable));
+  //       formData.append('selectedColumns', selectedColumns.join(','));
+
+  //       response = await fetch(`${import.meta.env.VITE_API_URL}/api/ingest-file`, {
+  //         method: 'POST',
+  //         body: formData
+  //       });
+  //     } else {
+  //       const payload = { 
+  //         direction,
+  //         connection: { ...connection, table },
+  //         selectedColumns,
+  //         filePath
+  //       };
+
+  //       response = await fetch(`${import.meta.env.VITE_API_URL}/api/ingest`, {
+  //         method: 'POST',
+  //         headers: { 'Content-Type': 'application/json' },
+  //         body: JSON.stringify(payload)
+  //       });
+  //     }
+
+  //     const data = await response.json();
+  //     if (response.ok) {
+  //       setResult(`Ingested ${data.count} rows successfully`);
+  //       setError('');
+  //     } else {
+  //       setResult('');
+  //       setError(data.error || 'Unknown error');
+  //     }
+  //   } catch (err) {
+  //     setResult('');
+  //     setError(err.message);
+  //   }
+  // };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-
+  
     if (!connection) {
       setError("No connection info provided. Please connect first.");
       return;
     }
-
+  
+    setIsLoading(true); // Show progress bar
     try {
       let response;
-
+  
       if (direction === 'file_to_clickhouse') {
         const formData = new FormData();
         const connectionWithTable = { ...connection, table };
         formData.append('file', file);
         formData.append('connection', JSON.stringify(connectionWithTable));
         formData.append('selectedColumns', selectedColumns.join(','));
-
+  
         response = await fetch(`${import.meta.env.VITE_API_URL}/api/ingest-file`, {
           method: 'POST',
           body: formData
@@ -145,14 +199,14 @@ export default function Ingest({ connection }) {
           selectedColumns,
           filePath
         };
-
+  
         response = await fetch(`${import.meta.env.VITE_API_URL}/api/ingest`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
       }
-
+  
       const data = await response.json();
       if (response.ok) {
         setResult(`Ingested ${data.count} rows successfully`);
@@ -164,11 +218,15 @@ export default function Ingest({ connection }) {
     } catch (err) {
       setResult('');
       setError(err.message);
+    } finally {
+      setIsLoading(false); // Hide progress bar
     }
   };
+  
 
   return (
     <div className="ingest-container">
+      <ProgressBar visible={isLoading} />
       <h2>Ingest Data</h2>
       <form onSubmit={handleSubmit}>
         <label>

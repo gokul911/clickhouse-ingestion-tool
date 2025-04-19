@@ -4,11 +4,16 @@ import com.clickhouse.jdbc.ClickHouseDataSource;
 import com.example.backend.model.ConnectionDetails;
 import com.example.backend.model.IngestionRequest;
 import com.example.backend.model.JoinRequest;
+
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.*;
 import java.sql.*;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class ClickHouseService {
 
@@ -130,64 +135,123 @@ public class ClickHouseService {
     }
 
     // 4b. Import CSV file to ClickHouse table (auto-detect columns from header)
-    public int importCsvFileToClickHouse(InputStream csvStream, ConnectionDetails details) throws Exception {
-    int inserted = 0;
-    String delimiter = ","; // default delimiter; you can modify if needed
+    // public int importCsvFileToClickHouse(InputStream csvStream, ConnectionDetails details) throws Exception {
+    // int inserted = 0;
+    // String delimiter = ","; // default delimiter; you can modify if needed
 
-    try (Connection conn = getConnection(details);
-         Statement stmt = conn.createStatement();
-         BufferedReader reader = new BufferedReader(new InputStreamReader(csvStream))) {
+    // try (Connection conn = getConnection(details);
+    //      Statement stmt = conn.createStatement();
+    //      BufferedReader reader = new BufferedReader(new InputStreamReader(csvStream))) {
 
-        // Read the header line to auto-detect columns
-        String headerLine = reader.readLine();
-        if (headerLine == null) {
-            throw new SQLException("CSV file is empty");
-        }
-        String[] columns = headerLine.split(delimiter);
+    //     // Read the header line to auto-detect columns
+    //     String headerLine = reader.readLine();
+    //     if (headerLine == null) {
+    //         throw new SQLException("CSV file is empty");
+    //     }
+    //     String[] columns = headerLine.split(delimiter);
 
-        // Base insert query
-        String insertQuery = "INSERT INTO " + details.getTable() + " (" + String.join(", ", columns) + ") VALUES ";
+    //     // Base insert query
+    //     String insertQuery = "INSERT INTO " + details.getTable() + " (" + String.join(", ", columns) + ") VALUES ";
 
-        String line;
-        while ((line = reader.readLine()) != null) {
-            String[] values = line.split(delimiter);  // Adjust delimiter if necessary
+    //     String line;
+    //     while ((line = reader.readLine()) != null) {
+    //         String[] values = line.split(delimiter);  // Adjust delimiter if necessary
 
-            if (values.length != columns.length) {
-                throw new SQLException("Mismatch between column count and value count in row: " + line);
-            }
+    //         if (values.length != columns.length) {
+    //             throw new SQLException("Mismatch between column count and value count in row: " + line);
+    //         }
 
-            // Build the value row for this line
-            StringBuilder valueRow = new StringBuilder("(");
-            for (int i = 0; i < values.length; i++) {
-                valueRow.append("'").append(values[i].replace("'", "''")).append("'");
-                if (i < values.length - 1) valueRow.append(",");
-            }
-            valueRow.append(")");
+    //         // Build the value row for this line
+    //         StringBuilder valueRow = new StringBuilder("(");
+    //         for (int i = 0; i < values.length; i++) {
+    //             valueRow.append("'").append(values[i].replace("'", "''")).append("'");
+    //             if (i < values.length - 1) valueRow.append(",");
+    //         }
+    //         valueRow.append(")");
 
-            // Build conditions for checking existence
-            StringBuilder whereConditions = new StringBuilder();
-            for (int i = 0; i < columns.length; i++) {
-                if (i > 0) whereConditions.append(" AND ");
-                whereConditions.append(columns[i])
-                              .append(" = ")
-                              .append("'")
-                              .append(values[i].replace("'", "''"))
-                              .append("'");
-            }
+    //         // Build conditions for checking existence
+    //         StringBuilder whereConditions = new StringBuilder();
+    //         for (int i = 0; i < columns.length; i++) {
+    //             if (i > 0) whereConditions.append(" AND ");
+    //             whereConditions.append(columns[i])
+    //                           .append(" = ")
+    //                           .append("'")
+    //                           .append(values[i].replace("'", "''"))
+    //                           .append("'");
+    //         }
 
-            // Check if record already exists
-            String checkQuery = "SELECT 1 FROM " + details.getTable() + 
-                                " WHERE " + whereConditions.toString() + " LIMIT 1";
-            ResultSet rs = stmt.executeQuery(checkQuery);
+    //         // Check if record already exists
+    //         String checkQuery = "SELECT 1 FROM " + details.getTable() + 
+    //                             " WHERE " + whereConditions.toString() + " LIMIT 1";
+    //         ResultSet rs = stmt.executeQuery(checkQuery);
             
-            // Insert only if the record doesn't exist
-            if (!rs.next()) {
-                stmt.execute(insertQuery + valueRow.toString());
-                inserted++;
+    //         // Insert only if the record doesn't exist
+    //         if (!rs.next()) {
+    //             stmt.execute(insertQuery + valueRow.toString());
+    //             inserted++;
+    //         }
+    //         rs.close();
+    //     }
+    //     }
+    //     return inserted;
+    // }
+    public int importCsvFileToClickHouse(InputStream csvStream, ConnectionDetails details) throws Exception {
+        int inserted = 0;
+
+        try (Connection conn = getConnection(details);
+            Statement stmt = conn.createStatement();
+            Reader reader = new InputStreamReader(csvStream);
+            CSVParser csvParser = CSVFormat.DEFAULT
+                    .withFirstRecordAsHeader()
+                    .withTrim()
+                    .parse(reader)) {
+
+            List<String> headers = csvParser.getHeaderNames();
+
+            String insertQueryPrefix = "INSERT INTO " + details.getTable() + " (" +
+                    headers.stream().map(col -> "`" + col + "`").collect(Collectors.joining(", ")) + ") VALUES ";
+
+            for (CSVRecord record : csvParser) {
+                if (record.size() != headers.size()) {
+                    System.out.println("Skipping row: column/value mismatch: " + record.toString());
+                    continue;
+                }
+
+                // Build the value row for insert
+                StringBuilder valueRow = new StringBuilder("(");
+                for (int i = 0; i < headers.size(); i++) {
+                    String val = record.get(i).replace("'", "''");
+                    valueRow.append("'").append(val).append("'");
+                    if (i < headers.size() - 1) valueRow.append(",");
+                }
+                valueRow.append(")");
+
+                // Build WHERE condition using all columns
+                StringBuilder whereConditions = new StringBuilder();
+                for (int i = 0; i < headers.size(); i++) {
+                    if (i > 0) whereConditions.append(" AND ");
+                    whereConditions.append("`")
+                            .append(headers.get(i))
+                            .append("` = '")
+                            .append(record.get(i).replace("'", "''"))
+                            .append("'");
+                }
+
+                String checkQuery = "SELECT 1 FROM " + details.getTable() +
+                                    " WHERE " + whereConditions + " LIMIT 1";
+
+                ResultSet rs = stmt.executeQuery(checkQuery);
+                if (!rs.next()) {
+                    stmt.execute(insertQueryPrefix + valueRow);
+                    inserted++;
+                    System.out.println("Row " + inserted + " inserted");
+                } else {
+                    System.out.println("Duplicate row skipped: " + record.toString());
+                }
+                rs.close();
             }
-            rs.close();
         }
-        }
+
         return inserted;
     }
 
