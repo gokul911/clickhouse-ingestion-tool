@@ -27,7 +27,7 @@ public class IngestionController {
     public ResponseEntity<String> connect(@RequestBody ConnectionDetails details) {
         boolean connected = clickHouseService.testConnection(details);
         return connected ? ResponseEntity.ok("Connection successful!") :
-                ResponseEntity.status(500).body("FAILED CONNECT");
+                ResponseEntity.status(500).body("FAILED TO CONNECT");
     }
 
     // 2. Fetch list of tables from ClickHouse
