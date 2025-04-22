@@ -13,7 +13,7 @@ public class WebConfig {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**") // allow all API paths
-                        .allowedOrigins("http://localhost:5173") // your React dev server
+                        .allowedOrigins("http://localhost:5173","https://clickhouse-ingestion-tool.vercel.app") // your React dev server
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
                         .allowCredentials(true);
