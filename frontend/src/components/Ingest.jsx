@@ -4,10 +4,10 @@ import ColumnsCheckbox from './ColumnsCheckbox';
 import { useNavigate } from 'react-router-dom';
 import ProgressBar from './ProgressBar';
 import "../styles/Ingest.css"
+// import ExportCsvButton from './ExportCsvButton';
 
 export default function Ingest({ connection }) {
   const [direction, setDirection] = useState('clickhouse_to_file');
-  const [filePath, setFilePath] = useState('');
   const [file, setFile] = useState(null);
   const [table, setTable] = useState('');
   const [columns, setColumns] = useState([]);
@@ -18,7 +18,6 @@ export default function Ingest({ connection }) {
   const navigate = useNavigate();
 
   const handleDirectionChange = (e) => setDirection(e.target.value);
-  const handleFilePathChange = (e) => setFilePath(e.target.value);
   const handleFileChange = (e) => setFile(e.target.files[0]);
   const handleTableChange = (e) => setTable(e.target.value);
 
@@ -29,6 +28,7 @@ export default function Ingest({ connection }) {
     }
 
     const payload = { ...connection, table };
+    setIsLoading(true);
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/fetch-columns`, {
         method: 'POST',
@@ -46,6 +46,8 @@ export default function Ingest({ connection }) {
       }
     } catch (err) {
       setError('Error: ' + err.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -61,7 +63,7 @@ export default function Ingest({ connection }) {
     }
 
     const payload = { ...connection, table };
-
+    setIsLoading(true);
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/preview-table`, {
         method: 'POST',
@@ -86,6 +88,8 @@ export default function Ingest({ connection }) {
       sessionStorage.setItem('previewError', err.message);
       setError(err.message);
       navigate('/preview');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -93,7 +97,8 @@ export default function Ingest({ connection }) {
     if (!file) return;
     const formData = new FormData();
     formData.append('file', file);
-  
+    
+    setIsLoading(true);
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/preview-csv`, {
         method: 'POST',
@@ -114,60 +119,10 @@ export default function Ingest({ connection }) {
       sessionStorage.setItem('previewData', JSON.stringify([]));
       sessionStorage.setItem('previewError', err.message);
       navigate('/preview'); 
+    } finally {
+      setIsLoading(false);
     }
   };
-  
-
-  // const handleSubmit = async (e) => {
-  //   e.preventDefault();
-
-  //   if (!connection) {
-  //     setError("No connection info provided. Please connect first.");
-  //     return;
-  //   }
-
-  //   try {
-  //     let response;
-
-  //     if (direction === 'file_to_clickhouse') {
-  //       const formData = new FormData();
-  //       const connectionWithTable = { ...connection, table };
-  //       formData.append('file', file);
-  //       formData.append('connection', JSON.stringify(connectionWithTable));
-  //       formData.append('selectedColumns', selectedColumns.join(','));
-
-  //       response = await fetch(`${import.meta.env.VITE_API_URL}/api/ingest-file`, {
-  //         method: 'POST',
-  //         body: formData
-  //       });
-  //     } else {
-  //       const payload = { 
-  //         direction,
-  //         connection: { ...connection, table },
-  //         selectedColumns,
-  //         filePath
-  //       };
-
-  //       response = await fetch(`${import.meta.env.VITE_API_URL}/api/ingest`, {
-  //         method: 'POST',
-  //         headers: { 'Content-Type': 'application/json' },
-  //         body: JSON.stringify(payload)
-  //       });
-  //     }
-
-  //     const data = await response.json();
-  //     if (response.ok) {
-  //       setResult(`Ingested ${data.count} rows successfully`);
-  //       setError('');
-  //     } else {
-  //       setResult('');
-  //       setError(data.error || 'Unknown error');
-  //     }
-  //   } catch (err) {
-  //     setResult('');
-  //     setError(err.message);
-  //   }
-  // };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -176,36 +131,62 @@ export default function Ingest({ connection }) {
       setError("No connection info provided. Please connect first.");
       return;
     }
+
+    setIsLoading(true);
   
-    setIsLoading(true); // Show progress bar
-    try {
-      let response;
-  
-      if (direction === 'file_to_clickhouse') {
-        const formData = new FormData();
-        const connectionWithTable = { ...connection, table };
-        formData.append('file', file);
-        formData.append('connection', JSON.stringify(connectionWithTable));
-        formData.append('selectedColumns', selectedColumns.join(','));
-  
-        response = await fetch(`${import.meta.env.VITE_API_URL}/api/ingest-file`, {
-          method: 'POST',
-          body: formData
-        });
-      } else {
-        const payload = { 
-          direction,
-          connection: { ...connection, table },
-          selectedColumns,
-          filePath
+    if (direction === 'clickhouse_to_file') {
+      try {
+        const payload = {
+          connectionDetails: connection,
+          table: table,
+          selectedColumns: selectedColumns,
+          delimiter: ','
         };
   
-        response = await fetch(`${import.meta.env.VITE_API_URL}/api/ingest`, {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/export-file`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
+  
+        if (!response.ok) {
+          throw new Error('Failed to export CSV');
+        }
+  
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${table}_exported.csv`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setError('');
+        setResult(`Exported ${table}_exported.csv successfully!`);
+  
+      } catch (err) {
+        setResult('');
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
       }
+      return;
+    }
+  
+    // file_to_clickhouse logic as you already have it:
+    setIsLoading(true);
+    try {
+      let response;
+      const formData = new FormData();
+      const connectionWithTable = { ...connection, table };
+      formData.append('file', file);
+      formData.append('connection', JSON.stringify(connectionWithTable));
+      formData.append('selectedColumns', selectedColumns.join(','));
+  
+      response = await fetch(`${import.meta.env.VITE_API_URL}/api/import-file`, {
+        method: 'POST',
+        body: formData
+      });
   
       const data = await response.json();
       if (response.ok) {
@@ -219,10 +200,9 @@ export default function Ingest({ connection }) {
       setResult('');
       setError(err.message);
     } finally {
-      setIsLoading(false); // Hide progress bar
+      setIsLoading(false);
     }
   };
-  
 
   return (
     <div className="ingest-container">
@@ -280,12 +260,6 @@ export default function Ingest({ connection }) {
                 onChange={setSelectedColumns}
               />
             )}
-            <input
-              type="text"
-              placeholder="File Path"
-              value={filePath}
-              onChange={handleFilePathChange}
-            />
           </>
         )}
 

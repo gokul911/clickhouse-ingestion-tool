@@ -1,7 +1,7 @@
 package com.example.backend.controller;
 
 import com.example.backend.model.ConnectionDetails;
-import com.example.backend.model.IngestionRequest;
+import com.example.backend.model.ExportRequest;
 import com.example.backend.model.JoinRequest;
 import com.example.backend.service.ClickHouseService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,6 +15,8 @@ import java.io.IOException;
 
 import java.util.List;
 import java.util.Map;
+
+import jakarta.servlet.http.HttpServletResponse;
 
 @RestController
 @RequestMapping("/api")
@@ -52,19 +54,8 @@ public class IngestionController {
         }
     }
 
-    // 4. Ingest data based on selected direction and columns
-    @PostMapping("/ingest")
-    public ResponseEntity<Map<String, Object>> ingest(@RequestBody IngestionRequest request) {
-        try {
-            int count = clickHouseService.performIngestion(request);
-            return ResponseEntity.ok(Map.of("count", count));
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
-        }
-    }
-
-    // This API allows multipart form data instead of json data
-    @PostMapping("/ingest-file")
+    // 4. Allow multipart form data instead of json data to be ingested into clickhouse table
+    @PostMapping("/import-file")
     public ResponseEntity<?> ingestFileToClickHouse(
             @RequestPart("file") MultipartFile file,
             @RequestPart("connection") String connectionJson
@@ -82,7 +73,30 @@ public class IngestionController {
         }
     }
 
-    // (Optional) 5. Preview first 100 records from ClickHouse
+    // 5. Converts clickhouse table into csv file and lets the user download it
+    @PostMapping("/export-file")
+    public void exportClickHouseToCsv(
+            @RequestBody ExportRequest exportRequest,
+            HttpServletResponse response
+    ) {
+        response.setContentType("text/csv");
+        response.setHeader("Content-Disposition", "attachment; filename=\"" + exportRequest.getTable() + ".csv\"");
+
+        try {
+            clickHouseService.streamClickHouseTableToCsv(
+                exportRequest.getConnectionDetails(),
+                exportRequest.getTable(),
+                exportRequest.getSelectedColumns(),
+                exportRequest.getDelimiter(),
+                response.getWriter()
+            );
+        } catch (Exception e) {
+            e.printStackTrace();
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // (Optional) 6. Preview first 100 records from ClickHouse or Uploaded CSV
     @PostMapping("/preview-table")
     public ResponseEntity<List<Map<String, Object>>> preview(@RequestBody ConnectionDetails details) {
         try {
@@ -92,8 +106,17 @@ public class IngestionController {
             return ResponseEntity.status(500).body(null);
         }
     }
+    @PostMapping("/preview-csv")
+    public ResponseEntity<?> previewCSV(@RequestParam("file") MultipartFile file) {
+        try {
+            return ResponseEntity.ok(clickHouseService.readPreview(file));
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to read CSV: " + e.getMessage()));
+        }
+    }
 
-    // (Bonus) 6. Join Table and export as csv
+    // (Bonus) 7. Join Table and export as csv
     @PostMapping("/join")
     public ResponseEntity<?> joinTables(@RequestBody JoinRequest request) {
         try {
@@ -104,14 +127,5 @@ public class IngestionController {
         }
     }
 
-    @PostMapping("/preview-csv")
-    public ResponseEntity<?> previewCSV(@RequestParam("file") MultipartFile file) {
-        try {
-            return ResponseEntity.ok(clickHouseService.readPreview(file));
-        } catch (IOException e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Failed to read CSV: " + e.getMessage()));
-        }
-    }
 
 }

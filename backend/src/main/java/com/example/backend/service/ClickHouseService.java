@@ -2,7 +2,6 @@ package com.example.backend.service;
 
 import com.clickhouse.jdbc.ClickHouseDataSource;
 import com.example.backend.model.ConnectionDetails;
-import com.example.backend.model.IngestionRequest;
 import com.example.backend.model.JoinRequest;
 
 import org.apache.commons.csv.CSVFormat;
@@ -74,127 +73,7 @@ public class ClickHouseService {
         return columns;
     }
 
-    // 4. Perform ingestion (ClickHouse → File OR File → ClickHouse)
-    public int performIngestion(IngestionRequest request) throws Exception {
-        if ("clickhouse_to_file".equalsIgnoreCase(request.direction)) {
-            return exportClickHouseToCsvFile(request);
-        } else if ("file_to_clickhouse".equalsIgnoreCase(request.direction)) {
-            // For JSON ingestion, we expect a filePath (the CSV file is already on disk)
-            if (request.filePath == null || request.filePath.isEmpty()) {
-                throw new IllegalArgumentException("File path is required for file-to-clickhouse ingestion.");
-            }
-            // Open a stream from the file at the given path and process it
-            try (InputStream csvStream = new FileInputStream(request.filePath)) {
-                return importCsvFileToClickHouse(csvStream, request.connection);
-            }
-        } else {
-            throw new IllegalArgumentException("Unsupported direction: " + request.direction);
-        }
-    }
-
-    // 4a. Export ClickHouse table to CSV
-    private int exportClickHouseToCsvFile(IngestionRequest request) throws SQLException {
-        ConnectionDetails details = request.connection;
-        String columnList = String.join(", ", request.selectedColumns);
-        String query = "SELECT " + columnList + " FROM " + details.getTable();
-        String delimiter = request.delimiter != null ? request.delimiter : ",";
-
-        try (Connection conn = getConnection(details);
-            Statement stmt = conn.createStatement();
-            ResultSet rs = stmt.executeQuery(query);
-            PrintWriter writer = new PrintWriter(request.filePath)) {
-
-            ResultSetMetaData meta = rs.getMetaData();
-            int count = 0;
-
-            // Write header
-            for (int i = 1; i <= meta.getColumnCount(); i++) {
-                writer.print(meta.getColumnName(i));
-                if (i < meta.getColumnCount()) writer.print(delimiter);
-            }
-            writer.println();
-
-            // Write rows
-            while (rs.next()) {
-                for (int i = 1; i <= meta.getColumnCount(); i++) {
-                    writer.print(rs.getString(i));
-                    if (i < meta.getColumnCount()) writer.print(delimiter);
-                }
-                writer.println();
-                count++;
-            }
-            return count;
-
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-            throw new SQLException("Failed to write to file: " + request.filePath, e);
-        } catch (SQLException e) {
-            e.printStackTrace();
-            throw e;
-        }
-    }
-
-    // 4b. Import CSV file to ClickHouse table (auto-detect columns from header)
-    // public int importCsvFileToClickHouse(InputStream csvStream, ConnectionDetails details) throws Exception {
-    // int inserted = 0;
-    // String delimiter = ","; // default delimiter; you can modify if needed
-
-    // try (Connection conn = getConnection(details);
-    //      Statement stmt = conn.createStatement();
-    //      BufferedReader reader = new BufferedReader(new InputStreamReader(csvStream))) {
-
-    //     // Read the header line to auto-detect columns
-    //     String headerLine = reader.readLine();
-    //     if (headerLine == null) {
-    //         throw new SQLException("CSV file is empty");
-    //     }
-    //     String[] columns = headerLine.split(delimiter);
-
-    //     // Base insert query
-    //     String insertQuery = "INSERT INTO " + details.getTable() + " (" + String.join(", ", columns) + ") VALUES ";
-
-    //     String line;
-    //     while ((line = reader.readLine()) != null) {
-    //         String[] values = line.split(delimiter);  // Adjust delimiter if necessary
-
-    //         if (values.length != columns.length) {
-    //             throw new SQLException("Mismatch between column count and value count in row: " + line);
-    //         }
-
-    //         // Build the value row for this line
-    //         StringBuilder valueRow = new StringBuilder("(");
-    //         for (int i = 0; i < values.length; i++) {
-    //             valueRow.append("'").append(values[i].replace("'", "''")).append("'");
-    //             if (i < values.length - 1) valueRow.append(",");
-    //         }
-    //         valueRow.append(")");
-
-    //         // Build conditions for checking existence
-    //         StringBuilder whereConditions = new StringBuilder();
-    //         for (int i = 0; i < columns.length; i++) {
-    //             if (i > 0) whereConditions.append(" AND ");
-    //             whereConditions.append(columns[i])
-    //                           .append(" = ")
-    //                           .append("'")
-    //                           .append(values[i].replace("'", "''"))
-    //                           .append("'");
-    //         }
-
-    //         // Check if record already exists
-    //         String checkQuery = "SELECT 1 FROM " + details.getTable() + 
-    //                             " WHERE " + whereConditions.toString() + " LIMIT 1";
-    //         ResultSet rs = stmt.executeQuery(checkQuery);
-            
-    //         // Insert only if the record doesn't exist
-    //         if (!rs.next()) {
-    //             stmt.execute(insertQuery + valueRow.toString());
-    //             inserted++;
-    //         }
-    //         rs.close();
-    //     }
-    //     }
-    //     return inserted;
-    // }
+    // 4. Import CSV file to ClickHouse table (auto-detect columns from header)
     public int importCsvFileToClickHouse(InputStream csvStream, ConnectionDetails details) throws Exception {
         int inserted = 0;
 
@@ -255,10 +134,52 @@ public class ClickHouseService {
         return inserted;
     }
 
-    // 5. Preview first 50 rows ( using LIMIT )
+    // 5. Export Clickhouse table to CSV file
+    public void streamClickHouseTableToCsv(
+        ConnectionDetails details,
+        String table,
+        List<String> selectedColumns,
+        String delimiter,
+        PrintWriter writer
+    ) throws SQLException {
+
+        String columnList = String.join(", ", selectedColumns);
+        String query = "SELECT " + columnList + " FROM " + table;
+        String actualDelimiter = (delimiter != null) ? delimiter : ",";
+
+        try (
+            Connection conn = getConnection(details);
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery(query)
+        ) {
+            ResultSetMetaData meta = rs.getMetaData();
+
+            // Write header
+            for (int i = 1; i <= meta.getColumnCount(); i++) {
+                writer.print(meta.getColumnName(i));
+                if (i < meta.getColumnCount()) writer.print(actualDelimiter);
+            }
+            writer.println();
+
+            // Write rows
+            while (rs.next()) {
+                for (int i = 1; i <= meta.getColumnCount(); i++) {
+                    writer.print(rs.getString(i));
+                    if (i < meta.getColumnCount()) writer.print(actualDelimiter);
+                }
+                writer.println();
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw e;
+        }
+    }
+
+    // 6. Preview first 100 rows ( using LIMIT )
     public List<Map<String, Object>> previewData(ConnectionDetails details) throws SQLException {
         List<Map<String, Object>> preview = new ArrayList<>();
-        String query = "SELECT * FROM " + details.getTable() + " LIMIT 50";
+        String query = "SELECT * FROM " + details.getTable() + " LIMIT 100";
 
         try (Connection conn = getConnection(details);
              Statement stmt = conn.createStatement();
@@ -283,7 +204,32 @@ public class ClickHouseService {
         return preview;
     }
 
-    // Constructs and executes the JOIN query based on the JoinRequest and returns the joined rows.
+    // 7. Preview Uploaded CSV file ->
+    public List<Map<String, String>> readPreview(MultipartFile file) throws IOException {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream()))) {
+            List<Map<String, String>> preview = new ArrayList<>();
+            String line;
+            String[] headers = null;
+            int count = 0;
+
+            while ((line = reader.readLine()) != null && count <= 50) {
+                String[] values = line.split(",");
+                if (headers == null) {
+                    headers = values;
+                } else {
+                    Map<String, String> row = new LinkedHashMap<>();
+                    for (int i = 0; i < headers.length && i < values.length; i++) {
+                        row.put(headers[i], values[i]);
+                    }
+                    preview.add(row);
+                    count++;
+                }
+            }
+            return preview;
+        }
+    }
+
+    // 8. Constructs and executes the JOIN query based on the JoinRequest and returns the joined rows.
     public List<Map<String, Object>> executeJoin(JoinRequest request) throws Exception {
         ConnectionDetails details = request.getConnection();
         List<String> tables = request.getTables();
@@ -328,39 +274,17 @@ public class ClickHouseService {
         }
         return rows;
     }
-    
-    // Preview Uploaded CSV file ->
-    public List<Map<String, String>> readPreview(MultipartFile file) throws IOException {
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream()))) {
-            List<Map<String, String>> preview = new ArrayList<>();
-            String line;
-            String[] headers = null;
-            int count = 0;
-
-            while ((line = reader.readLine()) != null && count <= 50) {
-                String[] values = line.split(",");
-                if (headers == null) {
-                    headers = values;
-                } else {
-                    Map<String, String> row = new LinkedHashMap<>();
-                    for (int i = 0; i < headers.length && i < values.length; i++) {
-                        row.put(headers[i], values[i]);
-                    }
-                    preview.add(row);
-                    count++;
-                }
-            }
-            return preview;
-        }
-    }
 
     // Utility: Get ClickHouse connection
     private Connection getConnection(ConnectionDetails details) throws SQLException {
-        String url = String.format("jdbc:clickhouse://%s:%d/%s?compress=0",
+        String url = String.format("jdbc:clickhouse://%s:%d/%s?secure=true&compress=0",
                 details.getHost(),
                 details.getPort(),
                 details.getDatabase()
         );
+
+        // 
+        System.out.println("Connecting to URL: " + url);
 
         Properties props = new Properties();
         props.setProperty("user", details.getUser());

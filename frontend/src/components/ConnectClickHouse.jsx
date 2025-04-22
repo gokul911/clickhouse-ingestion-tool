@@ -12,7 +12,7 @@ export default function ConnectClickHouse({ setConnectionInfo }) {
     jwtToken: ''
   });
   const [message, setMessage] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const isConnected = sessionStorage.getItem('isConnected') === 'true';
@@ -29,16 +29,16 @@ export default function ConnectClickHouse({ setConnectionInfo }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    const minLoadingTime = new Promise(resolve => setTimeout(resolve, 800));  // Minimum 800ms
+    setIsLoading(true);
+    // const minLoadingTime = new Promise(resolve => setTimeout(resolve, 800));  // Minimum 800ms
     try {
-      const responsePromise = fetch(`${import.meta.env.VITE_API_URL}/api/connect-clickhouse`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/connect-clickhouse`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(localConnection)
       });
   
-      const [response] = await Promise.all([responsePromise, minLoadingTime]);
+      // const [response] = await Promise.all([responsePromise, minLoadingTime]);
       
       const text = await response.text();
       console.log(response);
@@ -55,7 +55,7 @@ export default function ConnectClickHouse({ setConnectionInfo }) {
       console.log(err);
       setMessage('FAILED TO CONNECT');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -75,7 +75,7 @@ export default function ConnectClickHouse({ setConnectionInfo }) {
 
   return (
     <div className="connect-container">
-      <ProgressBar visible={loading}/>
+      <ProgressBar visible={isLoading}/>
       <h2>Connect to ClickHouse</h2>
       <form onSubmit={handleSubmit}>
         <input type="text" name="host" placeholder="Host" value={localConnection.host} onChange={handleChange} />

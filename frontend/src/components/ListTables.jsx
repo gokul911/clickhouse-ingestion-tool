@@ -1,16 +1,20 @@
 // src/components/ListTables.jsx
 import React, { useState } from 'react';
 import "../styles/ListTables.css";
+import ProgressBar from './ProgressBar';
 
 export default function ListTables({ connection }) {
   const [tables, setTables] = useState([]);
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const fetchTables = async () => {
     if (!connection) {
       setError('No connection info provided. Please connect first.');
       return;
     }
+
+    setIsLoading(true);
 
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/list-tables`, {
@@ -27,11 +31,14 @@ export default function ListTables({ connection }) {
       }
     } catch (err) {
       setError('Error: ' + err.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <div className="list-tables-container">
+      <ProgressBar visible={isLoading}/>
       <h2>List Tables</h2>
 
       {connection ? (

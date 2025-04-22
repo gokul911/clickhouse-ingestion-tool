@@ -20,8 +20,8 @@ export default function DataTable() {
     }
     
     // Optional: clear after retrieving
-    // sessionStorage.removeItem('previewData');
-    // sessionStorage.removeItem('previewError');
+    sessionStorage.removeItem('previewData');
+    sessionStorage.removeItem('previewError');
   }, []);
 
   console.log(error, " , ", previewData);
